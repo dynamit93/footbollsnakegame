@@ -21,7 +21,20 @@ The app is a static Vite build. The real-time server must be hosted separately (
 
 **Root directory `.`:** Use root [`vercel.json`](vercel.json) (`outputDirectory`: `client/dist`).
 
-Set **`VITE_SERVER_URL`** in Vercel to your Socket.IO server origin (e.g. `https://your-api.onrender.com`) so production does not rely on the Vite dev proxy.
+### Backend URL (required for the live site)
+
+Vercel only hosts the **static** UI. The game **API** is the `server` package (Express + Socket.IO).
+
+1. Deploy `server` somewhere that runs Node (Render, Railway, Fly, etc.). Default listen port is **3001**; set **`PORT`** if the host assigns one.
+2. On that host, set **`CLIENT_ORIGIN`** to your Vercel site origin (e.g. `https://your-app.vercel.app`) so Socket.IO CORS accepts the browser. Use a comma-separated list if you have preview URLs too.
+3. In **Vercel** → your project → **Settings → Environment Variables**, add **`VITE_SERVER_URL`** = the **public HTTPS origin** of your API (no path, no trailing slash), e.g. `https://football-snake-api.onrender.com`.
+4. **Redeploy** the Vercel project so the client is rebuilt with that variable (Vite bakes it in at build time).
+
+If the UI shows “not configured”, `VITE_SERVER_URL` is missing from the production build. If it shows “Cannot reach game server” with a URL, the API is down, blocked, or CORS/`CLIENT_ORIGIN` is wrong.
+
+Use a **HTTPS** API URL when the site is served over HTTPS (mixed content otherwise).
+
+**Deploy commit:** use the latest `main` (not `c2e4a64`) so the client build finds `../shared` (path alias). See [`client/.env.example`](client/.env.example).
 
 ## Repo
 

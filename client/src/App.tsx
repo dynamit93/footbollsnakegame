@@ -10,9 +10,16 @@ import type { PublicGameState } from '@soccer-snake/shared'
 import { WIN_SCORE } from '@soccer-snake/shared'
 import { GameBoard } from './GameBoard.tsx'
 
-function serverUrl(): string {
-  return import.meta.env.VITE_SERVER_URL || window.location.origin
+/** Where Socket.IO connects. Dev: same origin (Vite proxy). Prod: VITE_SERVER_URL only. */
+function socketOrigin(): string | null {
+  const fromEnv = import.meta.env.VITE_SERVER_URL?.trim().replace(/\/$/, '')
+  if (fromEnv) return fromEnv
+  if (import.meta.env.DEV) return window.location.origin
+  return null
 }
+
+const PROD_BACKEND_HELP =
+  'This site is static hosting only. Deploy the Node server from /server (Render, Railway, Fly, etc.), then in Vercel → Project → Environment Variables set VITE_SERVER_URL to that API origin (https://…, no path). Redeploy. On the server set CLIENT_ORIGIN to your Vercel URL for CORS.'
 
 export function App(): ReactElement {
   const [socket, setSocket] = useState<Socket | null>(null)
@@ -23,12 +30,20 @@ export function App(): ReactElement {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    const s = io(serverUrl(), { path: '/socket.io' })
+    const origin = socketOrigin()
+    if (!origin) {
+      setError(PROD_BACKEND_HELP)
+      return
+    }
+
+    const s = io(origin, { path: '/socket.io' })
     setSocket(s)
     s.on('connect', () => setError(null))
     s.on('connect_error', () =>
       setError(
-        'Cannot reach game server. Start the server (npm run dev from repo root) and check the port.',
+        import.meta.env.DEV
+          ? 'Cannot reach game server. From repo root run `npm run dev` so the API runs on port 3001 (or set VITE_DEV_SERVER_URL in .env).'
+          : `Cannot reach game server at ${origin}. Confirm the API is running, uses HTTPS if this page is HTTPS, and allows this origin in SERVER CORS (CLIENT_ORIGIN).`,
       ),
     )
     s.on('roomJoined', (p) => {
@@ -94,7 +109,7 @@ export function App(): ReactElement {
         </div>
         {error ? <div className="err">{error}</div> : null}
         <div style={{ fontSize: '0.82rem', color: 'var(--muted)' }}>
-          Server: <code>{serverUrl()}</code>
+          API: <code>{socketOrigin() ?? '(not configured — see message above)'}</code>
           {playerId ? (
             <>
               {' '}
