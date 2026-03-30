@@ -17,11 +17,11 @@ Open the Vite URL (usually [http://localhost:5173](http://localhost:5173)). Run 
 
 The app is a static Vite build. The real-time server must be hosted separately (Railway, Render, Fly, etc.).
 
-**Option A — Root directory `client` (common):** Vercel runs `npm install` and `npm run build` inside `client`. The client build compiles `../shared` first, so the full repo must be connected (Vercel clones the whole project; only commands run in the subfolder). Set **Output Directory** to `dist`.
+**Root directory `client`:** Enable *Include files outside the root directory in the Build Step* so `../shared/src` is available. The client resolves `@soccer-snake/shared` via TypeScript paths and a Vite alias (no `npm` link to `shared` required). [`client/vercel.json`](client/vercel.json) pins `buildCommand` / `outputDirectory`.
 
-**Option B — Root directory `.`:** The repo includes [`vercel.json`](vercel.json), which runs `npm run build -w shared && npm run build -w client` and sets **Output Directory** to `client/dist`.
+**Root directory `.`:** Use root [`vercel.json`](vercel.json) (`outputDirectory`: `client/dist`).
 
-Set **`VITE_SERVER_URL`** in Vercel to your WebSocket server URL (e.g. `https://your-api.onrender.com`) so production builds do not rely on the dev proxy.
+Set **`VITE_SERVER_URL`** in Vercel to your Socket.IO server origin (e.g. `https://your-api.onrender.com`) so production does not rely on the Vite dev proxy.
 
 ## Repo
 
