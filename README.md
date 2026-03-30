@@ -49,6 +49,20 @@ Use a **HTTPS** API URL when the site is served over HTTPS (mixed content otherw
 
 **Deploy commit:** use the latest `main` (not `c2e4a64`) so the client build finds `../shared` (path alias). See [`client/.env.example`](client/.env.example).
 
+## Check production (`curl`-style)
+
+After deploys propagate (~1–2 min), from repo root:
+
+```bash
+npm run verify:deploy
+```
+
+Expect **API /health** to pass only after the Render (or other) service exists and is awake.
+
 ## Repo
 
 [github.com/dynamit93/footbollsnakegame](https://github.com/dynamit93/footbollsnakegame)
+
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/dynamit93/footbollsnakegame)
+
+Docker (API only): `docker build -t footboll-api .` then run with `PORT` and `CLIENT_ORIGIN` (see [`Dockerfile`](Dockerfile)).

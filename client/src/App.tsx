@@ -13,6 +13,10 @@ import { GameBoard } from './GameBoard.tsx'
 /** Default host for Render service `footbollsnakegame-api` (see repo root `render.yaml`). */
 const DEFAULT_RENDER_API = 'https://footbollsnakegame-api.onrender.com'
 
+/** One-click deploy for this GitHub repo (set `CLIENT_ORIGIN` in dashboard after). */
+const DEPLOY_RENDER_HREF =
+  'https://render.com/deploy?repo=https://github.com/dynamit93/footbollsnakegame'
+
 function normalizeOriginInput(raw: string): string {
   return raw.trim().replace(/\/$/, '')
 }
@@ -30,63 +34,81 @@ function usableApiUrl(candidate: string, pageOrigin: string): string | null {
   }
 }
 
+type SocketFileConfig = { apiOrigin?: string; apiOrigins?: string[] }
+
+function collectCandidates(
+  page: string,
+  envRaw: string,
+  file: SocketFileConfig | null,
+): string[] {
+  const rawList: string[] = []
+  if (envRaw) rawList.push(envRaw)
+  if (file?.apiOrigins) rawList.push(...file.apiOrigins)
+  if (file?.apiOrigin) rawList.push(file.apiOrigin)
+  rawList.push(DEFAULT_RENDER_API)
+
+  const out: string[] = []
+  const seen = new Set<string>()
+  for (const r of rawList) {
+    const u = usableApiUrl(r, page)
+    if (u && !seen.has(u)) {
+      seen.add(u)
+      out.push(u)
+    }
+  }
+  return out
+}
+
+async function healthOk(base: string): Promise<boolean> {
+  try {
+    const ctrl = new AbortController()
+    const id = setTimeout(() => ctrl.abort(), 8000)
+    const r = await fetch(`${base}/health`, { mode: 'cors', signal: ctrl.signal })
+    clearTimeout(id)
+    return r.ok
+  } catch {
+    return false
+  }
+}
+
 type ResolveResult =
   | { ok: true; url: string; label: string }
   | { ok: false; message: string }
 
 async function resolveProductionSocket(): Promise<ResolveResult> {
   const page = window.location.origin
-
   const envRaw = import.meta.env.VITE_SERVER_URL?.trim() ?? ''
-  const fromEnv = usableApiUrl(envRaw, page)
-  if (fromEnv) {
-    return { ok: true, url: fromEnv, label: `${fromEnv} (VITE_SERVER_URL)` }
-  }
 
+  let file: SocketFileConfig | null = null
   try {
     const res = await fetch('/socket-config.json', { cache: 'no-store' })
-    if (res.ok) {
-      const data = (await res.json()) as { apiOrigin?: string }
-      const fromFile = usableApiUrl(data.apiOrigin ?? '', page)
-      if (fromFile) {
-        return {
-          ok: true,
-          url: fromFile,
-          label: `${fromFile} (socket-config.json; Vercel env ignored if wrong)`,
-        }
-      }
-    }
+    if (res.ok) file = (await res.json()) as SocketFileConfig
   } catch {
-    /* no file */
+    /* ignore */
   }
 
-  const fromDefault = usableApiUrl(DEFAULT_RENDER_API, page)
-  if (fromDefault) {
+  const candidates = collectCandidates(page, envRaw, file)
+  if (candidates.length === 0) {
     return {
-      ok: true,
-      url: fromDefault,
-      label: `${fromDefault} (built-in default — deploy API on Render or edit public/socket-config.json)`,
+      ok: false,
+      message:
+        'No API URL available. Deploy the /server app and set public/socket-config.json or VITE_SERVER_URL.',
     }
   }
 
-  if (envRaw) {
-    try {
-      if (new URL(normalizeOriginInput(envRaw)).origin === page) {
-        return {
-          ok: false,
-          message:
-            'VITE_SERVER_URL points at this Vercel site. Remove or fix it, set public/socket-config.json apiOrigin to your API, deploy the Node server, then redeploy.',
-        }
-      }
-    } catch {
-      /* fall through */
+  for (const url of candidates) {
+    if (await healthOk(url)) {
+      const fromEnv = usableApiUrl(envRaw, page) === url
+      const hint = fromEnv ? 'env' : 'discovered via /health'
+      return { ok: true, url, label: `${url} (${hint})` }
     }
   }
 
+  const fallback = candidates[0]!
   return {
-    ok: false,
-    message:
-      'No API URL found. Deploy the server (see README / render.yaml), set public/socket-config.json apiOrigin, or set VITE_SERVER_URL to that API (not this site), then redeploy.',
+    ok: true,
+    url: fallback,
+    label: `${fallback} (/health not OK — service may be sleeping or not created yet; use Deploy link)`,
   }
 }
 
@@ -112,7 +134,7 @@ export function App(): ReactElement {
         setError(
           import.meta.env.DEV
             ? 'Cannot reach game server. From repo root run `npm run dev` so the API runs on port 3001 (or set VITE_DEV_SERVER_URL in .env).'
-            : `Cannot reach game server at ${origin}. Deploy the API (Render/Railway), check /health, and set CLIENT_ORIGIN on the server to ${window.location.origin}`,
+            : `Cannot reach game server at ${origin}. Create the API on Render (Deploy link below). On the service set environment CLIENT_ORIGIN=${window.location.origin} then wait for the instance to wake (~1 min on free tier).`,
         ),
       )
       s.on('roomJoined', (p) => {
@@ -199,6 +221,13 @@ export function App(): ReactElement {
           </button>
         </div>
         {error ? <div className="err">{error}</div> : null}
+        {!import.meta.env.DEV && error ? (
+          <p className="sub" style={{ marginTop: '0.35rem' }}>
+            <a href={DEPLOY_RENDER_HREF} target="_blank" rel="noreferrer">
+              Deploy the game API on Render (GitHub repo)
+            </a>
+          </p>
+        ) : null}
         <div style={{ fontSize: '0.82rem', color: 'var(--muted)' }}>
           API: <code style={{ wordBreak: 'break-all' }}>{apiLine}</code>
           {playerId ? (
