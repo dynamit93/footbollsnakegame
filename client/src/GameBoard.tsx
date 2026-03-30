@@ -1,5 +1,10 @@
 import { useCallback, useEffect, useRef, type ReactElement } from 'react'
-import type { Direction, PublicGameState } from '@soccer-snake/shared'
+import type {
+  Direction,
+  PublicGameState,
+  PublicPlayer,
+  Vec2,
+} from '@soccer-snake/shared'
 
 const keyToDir = (k: string): Direction | null => {
   if (k === 'ArrowUp' || k === 'w' || k === 'W') return 'up'
@@ -24,7 +29,7 @@ function Cell(props: {
   let snakeTail = false
   for (const p of players) {
     if (p.segments.length === 0) continue
-    const idx = p.segments.findIndex((s) => s.x === x && s.y === y)
+    const idx = p.segments.findIndex((s: Vec2) => s.x === x && s.y === y)
     if (idx === 0) {
       snakeHead = true
       snakeColor = p.color
@@ -93,8 +98,8 @@ export function GameBoard(props: {
     return () => window.removeEventListener('keydown', fn)
   }, [sendDir])
 
-  const opp = players.find((p) => p.id !== selfId)
-  const me = players.find((p) => p.id === selfId)
+  const opp = players.find((p: PublicPlayer) => p.id !== selfId)
+  const me = players.find((p: PublicPlayer) => p.id === selfId)
 
   return (
     <section>
