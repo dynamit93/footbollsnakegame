@@ -1,0 +1,165 @@
+:root {
+  --bg: #0c1410;
+  --pitch: #14532d;
+  --pitch-line: #166534;
+  --text: #e7f7e9;
+  --muted: #86a78c;
+  --panel: #111916;
+  --goal: rgba(251, 191, 36, 0.25);
+  font-family: 'JetBrains Mono', 'Consolas', monospace;
+  line-height: 1.45;
+  color: var(--text);
+  background: radial-gradient(ellipse at 30% 20%, #132a1f 0%, var(--bg) 55%);
+  min-height: 100vh;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+}
+
+h1 {
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  margin: 0 0 0.35rem;
+  font-size: 1.65rem;
+}
+
+.sub {
+  color: var(--muted);
+  font-size: 0.9rem;
+  margin: 0 0 1rem;
+}
+
+.shell {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 1.5rem 1rem 2.5rem;
+}
+
+.panel {
+  background: var(--panel);
+  border: 1px solid #1f3127;
+  border-radius: 10px;
+  padding: 1rem 1.1rem;
+  margin-bottom: 1rem;
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+label {
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+input[type='text'] {
+  background: #0a100d;
+  border: 1px solid #243629;
+  color: var(--text);
+  padding: 0.45rem 0.6rem;
+  border-radius: 6px;
+  min-width: 8rem;
+  font: inherit;
+}
+
+button {
+  font: inherit;
+  cursor: pointer;
+  border-radius: 6px;
+  border: 1px solid #2d4a38;
+  background: linear-gradient(180deg, #1b3a28, #132a1f);
+  color: var(--text);
+  padding: 0.45rem 0.85rem;
+}
+
+button:hover {
+  border-color: #3d6b4f;
+}
+
+button.secondary {
+  background: #121a16;
+}
+
+.err {
+  color: #fda4af;
+  font-size: 0.85rem;
+  margin-top: 0.35rem;
+}
+
+.board-wrap {
+  overflow: auto;
+  border-radius: 8px;
+  border: 1px solid #1f3127;
+}
+
+.board {
+  display: grid;
+  gap: 1px;
+  background: var(--pitch-line);
+  width: fit-content;
+}
+
+.cell {
+  width: min(4vw, 22px);
+  height: min(4vw, 22px);
+  background: var(--pitch);
+  position: relative;
+}
+
+.cell.goal-left,
+.cell.goal-right {
+  background: var(--goal);
+}
+
+.cell.ball::after {
+  content: '';
+  position: absolute;
+  inset: 18%;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #fafafa, #0f172a 70%);
+  box-shadow: inset -1px -1px 0 #334155;
+}
+
+.snake-cell {
+  border-radius: 3px;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.35);
+}
+
+.snake-head {
+  outline: 2px solid rgba(255, 255, 255, 0.35);
+  outline-offset: -2px;
+}
+
+.hud {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1.25rem;
+  font-size: 0.85rem;
+  margin-bottom: 0.75rem;
+}
+
+.pill {
+  background: #0a100d;
+  padding: 0.25rem 0.55rem;
+  border-radius: 999px;
+  border: 1px solid #243629;
+}
+
+.tag-you {
+  color: #fef08a;
+}
+
+@media (max-width: 520px) {
+  .cell {
+    width: 12px;
+    height: 12px;
+  }
+}
