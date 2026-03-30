@@ -13,9 +13,10 @@ const GAMES = [
   {
     id: 'neon-hollow',
     title: 'Neon Hollow',
-    tagline: 'Browser FPS — pointer lock, WASD, blast hovering targets in a neon arena.',
+    tagline:
+      'Browser FPS with friends — same room code as Soccer Snake; see other players as capsules.',
     path: '/games/neon-hollow',
-    badge: 'Single-player',
+    badge: 'Multiplayer',
     tone: 'neon',
   },
 ] as const

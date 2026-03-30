@@ -31,6 +31,22 @@ export interface PublicPlayer {
   displayName: string
 }
 
+/** Multiplayer pose for Neon Hollow (FPS); y height is fixed client-side. */
+export interface FpsPlayerPose {
+  id: string
+  displayName: string
+  x: number
+  z: number
+  /** Yaw in radians (Three.js camera.rotation.y). */
+  ry: number
+}
+
+export interface FpsSpawn {
+  x: number
+  z: number
+  ry: number
+}
+
 export interface ServerToClientEvents {
   state: (s: PublicGameState) => void
   roomJoined: (p: {
@@ -39,6 +55,8 @@ export interface ServerToClientEvents {
     state: PublicGameState
   }) => void
   error: (msg: string) => void
+  fpsRoomJoined: (p: { roomCode: string; playerId: string; spawn: FpsSpawn }) => void
+  fpsState: (s: { poses: FpsPlayerPose[] }) => void
 }
 
 /** Object payloads avoid Socket.IO argument-order edge cases in the wild. */
@@ -64,6 +82,14 @@ export interface ClientToServerEvents {
   ) => void
   setDirection: (dir: Direction) => void
   rematch: () => void
+  /** Neon Hollow — isolate from soccer rooms via `fps:` Socket.IO channel. */
+  fpsCreateRoom: (payload: CreateRoomPayload | string) => void
+  fpsJoinRoom: (
+    codeOrPayload: string | JoinRoomPayload,
+    displayName?: string,
+  ) => void
+  fpsLeaveRoom: () => void
+  fpsPose: (pose: { x: number; z: number; ry: number }) => void
 }
 
 export const GRID_W = 24

@@ -367,6 +367,35 @@ button.secondary {
   z-index: 5;
 }
 
+.fps-leave {
+  font: inherit;
+  cursor: pointer;
+  border-radius: 6px;
+  border: 1px solid rgba(167, 139, 250, 0.45);
+  background: rgba(30, 16, 52, 0.9);
+  color: #e9d5ff;
+  padding: 0.35rem 0.65rem;
+  font-size: 0.82rem;
+}
+
+.fps-leave:hover {
+  border-color: #c4b5fd;
+}
+
+.fps-lobby {
+  padding-top: 0.5rem;
+}
+
+.fps-lobby-title {
+  font-size: 1.5rem;
+  margin: 0 0 0.35rem;
+  color: #e9d5ff;
+}
+
+.fps-host--hidden {
+  display: none !important;
+}
+
 .fps-stats {
   display: flex;
   flex-wrap: wrap;
@@ -409,18 +438,38 @@ button.secondary {
   text-align: center;
 }
 
+@keyframes fpsCrossPulse {
+  0% {
+    transform: translate(-50%, -50%) scale(1.85);
+    border-color: #fef08a;
+    box-shadow:
+      0 0 22px #fde047,
+      0 0 8px rgba(167, 139, 250, 0.6);
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(1);
+    border-color: rgba(250, 250, 250, 0.55);
+    box-shadow: 0 0 10px rgba(167, 139, 250, 0.35);
+  }
+}
+
 .fps-crosshair {
   position: fixed;
   left: 50%;
   top: 50%;
   width: 9px;
   height: 9px;
-  margin: -4px 0 0 -4px;
+  transform: translate(-50%, -50%);
+  margin: 0;
   border: 1px solid rgba(250, 250, 250, 0.55);
   border-radius: 1px;
   pointer-events: none;
   z-index: 10;
   box-shadow: 0 0 10px rgba(167, 139, 250, 0.35);
+}
+
+.fps-crosshair--fired {
+  animation: fpsCrossPulse 0.14s ease-out;
 }
 
 .fps-help {

@@ -9,6 +9,7 @@ import {
   TICK_MS,
   type ClientToServerEvents,
   type Direction,
+  type FpsPlayerPose,
   type JoinRoomPayload,
   type PublicGameState,
   type ServerToClientEvents,
@@ -43,6 +44,91 @@ interface Room {
 
 const rooms = new Map<string, Room>()
 const socketRoom = new Map<string, string>()
+
+const FPS_MAX_PLAYERS = 8
+const FPS_BROADCAST_MS = 45
+
+function snakeChannel(code: string): string {
+  return `snake:${code}`
+}
+
+function fpsChannel(code: string): string {
+  return `fps:${code}`
+}
+
+interface FpsRoom {
+  code: string
+  sockets: string[]
+  displayNames: Record<string, string>
+  poses: Record<string, { x: number; z: number; ry: number }>
+  broadcastTimer: ReturnType<typeof setTimeout> | null
+}
+
+const fpsRooms = new Map<string, FpsRoom>()
+const fpsSocketRoom = new Map<string, string>()
+
+function fpsSpawnForIndex(index: number): { x: number; z: number; ry: number } {
+  const angle = (index / FPS_MAX_PLAYERS) * Math.PI * 2
+  const r = 7 + (index % 3) * 1.2
+  const x = Math.round(Math.cos(angle) * r * 100) / 100
+  const z = Math.round(Math.sin(angle) * r * 100) / 100
+  return { x, z, ry: -angle }
+}
+
+function emitFpsSnapshot(
+  ioServer: Server<ClientToServerEvents, ServerToClientEvents>,
+  room: FpsRoom,
+): void {
+  const poses: FpsPlayerPose[] = room.sockets.map((id) => {
+    const p = room.poses[id] ?? { x: 0, z: 0, ry: 0 }
+    return {
+      id,
+      displayName: sanitizeDisplayName(room.displayNames[id]) || 'Player',
+      x: p.x,
+      z: p.z,
+      ry: p.ry,
+    }
+  })
+  ioServer.to(fpsChannel(room.code)).emit('fpsState', { poses })
+}
+
+function scheduleFpsBroadcast(
+  ioServer: Server<ClientToServerEvents, ServerToClientEvents>,
+  room: FpsRoom,
+): void {
+  if (room.broadcastTimer) return
+  room.broadcastTimer = setTimeout(() => {
+    room.broadcastTimer = null
+    emitFpsSnapshot(ioServer, room)
+  }, FPS_BROADCAST_MS)
+}
+
+function leaveFpsRoom(
+  socketId: string,
+  ioServer: Server<ClientToServerEvents, ServerToClientEvents>,
+): void {
+  const code = fpsSocketRoom.get(socketId)
+  if (!code) return
+  fpsSocketRoom.delete(socketId)
+  const room = fpsRooms.get(code)
+  if (!room) return
+
+  void ioServer.sockets.sockets.get(socketId)?.leave(fpsChannel(code))
+  room.sockets = room.sockets.filter((id) => id !== socketId)
+  delete room.displayNames[socketId]
+  delete room.poses[socketId]
+  if (room.broadcastTimer) {
+    clearTimeout(room.broadcastTimer)
+    room.broadcastTimer = null
+  }
+
+  if (room.sockets.length === 0) {
+    fpsRooms.delete(code)
+    return
+  }
+
+  emitFpsSnapshot(ioServer, room)
+}
 
 const DISPLAY_NAME_MAX = 24
 
@@ -119,7 +205,7 @@ function emitRoom(
       ? toPublicState(room.sim)
       : lobbyPublic(room)
   const pub = finalizePublicState(base, room)
-  io.to(room.code).emit('state', pub)
+  io.to(snakeChannel(room.code)).emit('state', pub)
 }
 
 function stopTick(room: Room): void {
@@ -175,7 +261,7 @@ function leaveRoom(socketId: string, ioServer: Server<ClientToServerEvents, Serv
   stopTick(room)
   delete room.displayNames[socketId]
   room.sockets = room.sockets.filter((id) => id !== socketId)
-  void ioServer.sockets.sockets.get(socketId)?.leave(code)
+  void ioServer.sockets.sockets.get(socketId)?.leave(snakeChannel(code))
   room.sim = null
   room.pendingInput = {}
 
@@ -231,6 +317,7 @@ io.on('connection', (socket) => {
       socket.emit('error', 'Enter your name (1–24 characters).')
       return
     }
+    leaveFpsRoom(socket.id, io)
     leaveRoom(socket.id, io)
     let code = randomRoomCode()
     while (rooms.has(code)) code = randomRoomCode()
@@ -244,10 +331,10 @@ io.on('connection', (socket) => {
     }
     rooms.set(code, room)
     socketRoom.set(socket.id, code)
-    void socket.join(code)
+    void socket.join(snakeChannel(code))
     const pub = finalizePublicState(lobbyPublic(room), room)
     socket.emit('roomJoined', { roomCode: code, playerId: socket.id, state: pub })
-    io.to(code).emit('state', pub)
+    io.to(snakeChannel(code)).emit('state', pub)
   })
 
   socket.on('joinRoom', (codeOrPayload, displayNameArg) => {
@@ -288,18 +375,132 @@ io.on('connection', (socket) => {
       socket.emit('error', 'Already in room')
       return
     }
+    leaveFpsRoom(socket.id, io)
     leaveRoom(socket.id, io)
     room.sockets.push(socket.id)
     room.displayNames[socket.id] = name
     socketRoom.set(socket.id, code)
-    void socket.join(code)
+    void socket.join(snakeChannel(code))
     ensureMatchStarted(io, room)
     const r = rooms.get(code)!
     const base =
       r.sim && r.sockets.length === 2 ? toPublicState(r.sim) : lobbyPublic(r)
     const pub = finalizePublicState(base, r)
     socket.emit('roomJoined', { roomCode: code, playerId: socket.id, state: pub })
-    io.to(code).emit('state', pub)
+    io.to(snakeChannel(code)).emit('state', pub)
+  })
+
+  socket.on('fpsCreateRoom', (payload) => {
+    const rawName =
+      typeof payload === 'string'
+        ? payload
+        : payload &&
+            typeof payload === 'object' &&
+            payload !== null &&
+            'displayName' in payload
+          ? (payload as { displayName: unknown }).displayName
+          : undefined
+    const name = sanitizeDisplayName(rawName)
+    if (!name) {
+      socket.emit('error', 'Enter your name (1–24 characters).')
+      return
+    }
+    leaveRoom(socket.id, io)
+    leaveFpsRoom(socket.id, io)
+    let code = randomRoomCode()
+    while (fpsRooms.has(code) || rooms.has(code)) code = randomRoomCode()
+    const spawn = fpsSpawnForIndex(0)
+    const room: FpsRoom = {
+      code,
+      sockets: [socket.id],
+      displayNames: { [socket.id]: name },
+      poses: { [socket.id]: { x: spawn.x, z: spawn.z, ry: spawn.ry } },
+      broadcastTimer: null,
+    }
+    fpsRooms.set(code, room)
+    fpsSocketRoom.set(socket.id, code)
+    void socket.join(fpsChannel(code))
+    socket.emit('fpsRoomJoined', { roomCode: code, playerId: socket.id, spawn })
+    scheduleFpsBroadcast(io, room)
+  })
+
+  socket.on('fpsJoinRoom', (codeOrPayload, displayNameArg) => {
+    let rawCode: string
+    let rawName: unknown
+    if (typeof codeOrPayload === 'string' && displayNameArg !== undefined) {
+      rawCode = codeOrPayload
+      rawName = displayNameArg
+    } else if (
+      codeOrPayload &&
+      typeof codeOrPayload === 'object' &&
+      'code' in codeOrPayload &&
+      'displayName' in codeOrPayload
+    ) {
+      const p = codeOrPayload as JoinRoomPayload
+      rawCode = typeof p.code === 'string' ? p.code : String(p.code)
+      rawName = p.displayName
+    } else {
+      socket.emit('error', 'Invalid FPS join request.')
+      return
+    }
+    const name = sanitizeDisplayName(rawName)
+    if (!name) {
+      socket.emit('error', 'Enter your name (1–24 characters).')
+      return
+    }
+    const code = rawCode.trim().toUpperCase()
+    const room = fpsRooms.get(code)
+    if (!room) {
+      socket.emit('error', 'FPS room not found')
+      return
+    }
+    if (room.sockets.length >= FPS_MAX_PLAYERS) {
+      socket.emit('error', 'FPS arena is full')
+      return
+    }
+    if (room.sockets.includes(socket.id)) {
+      socket.emit('error', 'Already in FPS room')
+      return
+    }
+    leaveRoom(socket.id, io)
+    leaveFpsRoom(socket.id, io)
+    const idx = room.sockets.length
+    const spawn = fpsSpawnForIndex(idx)
+    room.sockets.push(socket.id)
+    room.displayNames[socket.id] = name
+    room.poses[socket.id] = { x: spawn.x, z: spawn.z, ry: spawn.ry }
+    fpsSocketRoom.set(socket.id, code)
+    void socket.join(fpsChannel(code))
+    socket.emit('fpsRoomJoined', { roomCode: code, playerId: socket.id, spawn })
+    scheduleFpsBroadcast(io, room)
+  })
+
+  socket.on('fpsLeaveRoom', () => {
+    leaveFpsRoom(socket.id, io)
+  })
+
+  socket.on('fpsPose', (pose) => {
+    const code = fpsSocketRoom.get(socket.id)
+    if (!code) return
+    const room = fpsRooms.get(code)
+    if (!room || !room.sockets.includes(socket.id)) return
+    if (
+      typeof pose?.x !== 'number' ||
+      typeof pose?.z !== 'number' ||
+      typeof pose?.ry !== 'number' ||
+      !Number.isFinite(pose.x) ||
+      !Number.isFinite(pose.z) ||
+      !Number.isFinite(pose.ry)
+    ) {
+      return
+    }
+    const half = 21
+    room.poses[socket.id] = {
+      x: Math.max(-half, Math.min(half, pose.x)),
+      z: Math.max(-half, Math.min(half, pose.z)),
+      ry: pose.ry,
+    }
+    scheduleFpsBroadcast(io, room)
   })
 
   socket.on('setDirection', (dir) => {
@@ -326,6 +527,7 @@ io.on('connection', (socket) => {
 
   socket.on('disconnect', () => {
     leaveRoom(socket.id, io)
+    leaveFpsRoom(socket.id, io)
   })
 })
 
