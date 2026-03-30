@@ -41,9 +41,27 @@ export interface ServerToClientEvents {
   error: (msg: string) => void
 }
 
+/** Object payloads avoid Socket.IO argument-order edge cases in the wild. */
+export interface CreateRoomPayload {
+  displayName: string
+}
+
+export interface JoinRoomPayload {
+  code: string
+  displayName: string
+}
+
 export interface ClientToServerEvents {
-  createRoom: (displayName: string) => void
-  joinRoom: (code: string, displayName: string) => void
+  /** String is a legacy shape; prefer `CreateRoomPayload`. */
+  createRoom: (payload: CreateRoomPayload | string) => void
+  /**
+   * Prefer `JoinRoomPayload` as a single argument.
+   * Two string arguments are supported for older clients (`code`, `displayName`).
+   */
+  joinRoom: (
+    codeOrPayload: string | JoinRoomPayload,
+    displayName?: string,
+  ) => void
   setDirection: (dir: Direction) => void
   rematch: () => void
 }

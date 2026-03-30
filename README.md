@@ -1,6 +1,15 @@
-# Football Snake Game
+# Game Liberty
 
-Soccer-themed grid game with Snake-style movement and online 1v1 multiplayer (React + Socket.IO).
+A **browser game library** (Steam-style hub for web games) built with React and Vite. Open the app, pick a title, and play — no install.
+
+Included games:
+
+| Game | Route | Notes |
+|------|--------|------|
+| **Soccer Snake** | `/games/soccer-snake` | Online 1v1 grid soccer + Snake (Socket.IO + dedicated API) |
+| **Neon Hollow** | `/games/neon-hollow` | Single-player Three.js FPS: pointer lock, WASD, shoot targets |
+
+The home page at `/` lists all games. Deep links work on Vercel thanks to SPA `rewrites` in [`client/vercel.json`](client/vercel.json) and the root [`vercel.json`](vercel.json).
 
 **Production UI:** [https://footbollsnakegame-client.vercel.app/](https://footbollsnakegame-client.vercel.app/) (canonical URL is set in `client/index.html` and [`client/src/site.ts`](client/src/site.ts)).
 

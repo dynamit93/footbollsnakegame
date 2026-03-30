@@ -9,6 +9,7 @@ import {
   TICK_MS,
   type ClientToServerEvents,
   type Direction,
+  type JoinRoomPayload,
   type PublicGameState,
   type ServerToClientEvents,
 } from '@soccer-snake/shared'
@@ -53,16 +54,34 @@ function sanitizeDisplayName(raw: unknown): string {
     .replace(/[\u0000-\u001f\u007f]/g, '')
 }
 
+/** Replace socket ids in sim messages with display names (longest id first). */
+function humanizeLastEvent(
+  msg: string | null,
+  names: Record<string, string>,
+): string | null {
+  if (msg == null) return msg
+  let out = msg
+  const ids = Object.keys(names).sort((a, b) => b.length - a.length)
+  for (const id of ids) {
+    if (!id || !out.includes(id)) continue
+    const label = sanitizeDisplayName(names[id]) || 'Player'
+    out = out.split(id).join(label)
+  }
+  return out
+}
+
 function finalizePublicState(pub: PublicGameState, room: Room): PublicGameState {
+  const names = room.displayNames ?? {}
   return {
     ...pub,
     players: pub.players.map((p) => {
-      const n = sanitizeDisplayName(room.displayNames[p.id])
+      const n = sanitizeDisplayName(names[p.id])
       return {
         ...p,
         displayName: n || 'Player',
       }
     }),
+    lastEvent: humanizeLastEvent(pub.lastEvent, names),
   }
 }
 
@@ -197,8 +216,17 @@ const io = new Server<ClientToServerEvents, ServerToClientEvents>(httpServer, {
 })
 
 io.on('connection', (socket) => {
-  socket.on('createRoom', (displayName) => {
-    const name = sanitizeDisplayName(displayName)
+  socket.on('createRoom', (payload) => {
+    const rawName =
+      typeof payload === 'string'
+        ? payload
+        : payload &&
+            typeof payload === 'object' &&
+            payload !== null &&
+            'displayName' in payload
+          ? (payload as { displayName: unknown }).displayName
+          : undefined
+    const name = sanitizeDisplayName(rawName)
     if (!name) {
       socket.emit('error', 'Enter your name (1–24 characters).')
       return
@@ -222,8 +250,26 @@ io.on('connection', (socket) => {
     io.to(code).emit('state', pub)
   })
 
-  socket.on('joinRoom', (rawCode, displayName) => {
-    const name = sanitizeDisplayName(displayName)
+  socket.on('joinRoom', (codeOrPayload, displayNameArg) => {
+    let rawCode: string
+    let rawName: unknown
+    if (typeof codeOrPayload === 'string' && displayNameArg !== undefined) {
+      rawCode = codeOrPayload
+      rawName = displayNameArg
+    } else if (
+      codeOrPayload &&
+      typeof codeOrPayload === 'object' &&
+      'code' in codeOrPayload &&
+      'displayName' in codeOrPayload
+    ) {
+      const p = codeOrPayload as JoinRoomPayload
+      rawCode = typeof p.code === 'string' ? p.code : String(p.code)
+      rawName = p.displayName
+    } else {
+      socket.emit('error', 'Invalid join request.')
+      return
+    }
+    const name = sanitizeDisplayName(rawName)
     if (!name) {
       socket.emit('error', 'Enter your name (1–24 characters).')
       return

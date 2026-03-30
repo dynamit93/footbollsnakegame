@@ -170,7 +170,7 @@ export function stepSim(state: SimState, input: Record<string, Direction | undef
     if (!dead0 && dead1) survivor = p0
     if (survivor) {
       next.scores[survivor.id] = (next.scores[survivor.id] ?? 0) + 1
-      next.lastEvent = `Elimination — point to ${survivor.id.slice(0, 6)}`
+      next.lastEvent = `Elimination — point to ${survivor.id}`
       if (next.scores[survivor.id]! >= WIN_SCORE) {
         next.phase = 'match_over'
         next.winnerId = survivor.id
@@ -216,7 +216,7 @@ export function stepSim(state: SimState, input: Record<string, Direction | undef
   if (bx === GRID_W - 1) {
     const scorer = attackRight
     next.scores[scorer] = (next.scores[scorer] ?? 0) + 1
-    next.lastEvent = `Goal! ${scorer.slice(0, 6)} scores on the right`
+    next.lastEvent = `Goal! ${scorer} scores on the right`
     if (next.scores[scorer]! >= WIN_SCORE) {
       next.phase = 'match_over'
       next.winnerId = scorer
@@ -227,7 +227,7 @@ export function stepSim(state: SimState, input: Record<string, Direction | undef
   if (bx === 0) {
     const scorer = attackLeft
     next.scores[scorer] = (next.scores[scorer] ?? 0) + 1
-    next.lastEvent = `Goal! ${scorer.slice(0, 6)} scores on the left`
+    next.lastEvent = `Goal! ${scorer} scores on the left`
     if (next.scores[scorer]! >= WIN_SCORE) {
       next.phase = 'match_over'
       next.winnerId = scorer

@@ -82,6 +82,11 @@ export function GameBoard(props: {
   const { grid, players, ball, phase, scores, winnerId, lastEvent } = state
   const lastDir = useRef<Direction | null>(null)
 
+  const labelForId = useCallback(
+    (id: string) => players.find((p) => p.id === id)?.displayName ?? id.slice(0, 6),
+    [players],
+  )
+
   const sendDir = useCallback(
     (d: Direction) => {
       if (phase !== 'playing') return
@@ -128,11 +133,11 @@ export function GameBoard(props: {
           <>
             <span className="pill">
               Scores on <strong>right edge</strong>:{' '}
-              <code>{state.attackRight.slice(0, 6)}…</code>
+              <code>{labelForId(state.attackRight)}</code>
             </span>
             <span className="pill">
               Scores on <strong>left edge</strong>:{' '}
-              <code>{state.attackLeft.slice(0, 6)}…</code>
+              <code>{labelForId(state.attackLeft)}</code>
             </span>
           </>
         ) : null}
