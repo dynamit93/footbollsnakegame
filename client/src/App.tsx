@@ -9,6 +9,7 @@ import { io, type Socket } from 'socket.io-client'
 import type { PublicGameState } from '@soccer-snake/shared'
 import { WIN_SCORE } from '@soccer-snake/shared'
 import { GameBoard } from './GameBoard.tsx'
+import { CANONICAL_CLIENT_URL } from './site.ts'
 
 /** Default host for Render service `footbollsnakegame-api` (see repo root `render.yaml`). */
 const DEFAULT_RENDER_API = 'https://footbollsnakegame-api.onrender.com'
@@ -34,7 +35,11 @@ function usableApiUrl(candidate: string, pageOrigin: string): string | null {
   }
 }
 
-type SocketFileConfig = { apiOrigin?: string; apiOrigins?: string[] }
+type SocketFileConfig = {
+  publicSiteUrl?: string
+  apiOrigin?: string
+  apiOrigins?: string[]
+}
 
 function collectCandidates(
   page: string,
@@ -134,7 +139,7 @@ export function App(): ReactElement {
         setError(
           import.meta.env.DEV
             ? 'Cannot reach game server. From repo root run `npm run dev` so the API runs on port 3001 (or set VITE_DEV_SERVER_URL in .env).'
-            : `Cannot reach game server at ${origin}. Create the API on Render (Deploy link below). On the service set environment CLIENT_ORIGIN=${window.location.origin} then wait for the instance to wake (~1 min on free tier).`,
+            : `Cannot reach game server at ${origin}. Create the API on Render (Deploy link below). Set CLIENT_ORIGIN on the API to ${CANONICAL_CLIENT_URL} (and any preview URLs you use). Wait ~1 min on free tier for cold start.`,
         ),
       )
       s.on('roomJoined', (p) => {
@@ -229,6 +234,11 @@ export function App(): ReactElement {
           </p>
         ) : null}
         <div style={{ fontSize: '0.82rem', color: 'var(--muted)' }}>
+          Official site:{' '}
+          <a href={`${CANONICAL_CLIENT_URL}/`} target="_blank" rel="noreferrer">
+            {CANONICAL_CLIENT_URL}
+          </a>
+          <br />
           API: <code style={{ wordBreak: 'break-all' }}>{apiLine}</code>
           {playerId ? (
             <>

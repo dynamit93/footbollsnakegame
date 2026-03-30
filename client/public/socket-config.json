@@ -1,4 +1,5 @@
 {
+  "publicSiteUrl": "https://footbollsnakegame-client.vercel.app",
   "apiOrigin": "https://footbollsnakegame-api.onrender.com",
   "apiOrigins": [
     "https://footbollsnakegame.onrender.com"

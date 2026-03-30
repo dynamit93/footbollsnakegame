@@ -2,6 +2,8 @@
 
 Soccer-themed grid game with Snake-style movement and online 1v1 multiplayer (React + Socket.IO).
 
+**Production UI:** [https://footbollsnakegame-client.vercel.app/](https://footbollsnakegame-client.vercel.app/) (canonical URL is set in `client/index.html` and [`client/src/site.ts`](client/src/site.ts)).
+
 ## Quick start
 
 Requires Node.js 20+.
