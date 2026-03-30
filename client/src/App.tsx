@@ -10,16 +10,52 @@ import type { PublicGameState } from '@soccer-snake/shared'
 import { WIN_SCORE } from '@soccer-snake/shared'
 import { GameBoard } from './GameBoard.tsx'
 
-/** Where Socket.IO connects. Dev: same origin (Vite proxy). Prod: VITE_SERVER_URL only. */
-function socketOrigin(): string | null {
-  const fromEnv = import.meta.env.VITE_SERVER_URL?.trim().replace(/\/$/, '')
-  if (fromEnv) return fromEnv
-  if (import.meta.env.DEV) return window.location.origin
-  return null
+type SocketTarget = { url: string } | { block: string }
+
+/** Dev: browser origin (Vite proxies /socket.io). Prod: VITE_SERVER_URL must be a different host (your Node API), not this Vercel app. */
+function resolveSocketTarget(): SocketTarget {
+  const raw = import.meta.env.VITE_SERVER_URL?.trim() ?? ''
+  const fromEnv = raw.replace(/\/$/, '')
+
+  if (import.meta.env.DEV) {
+    return { url: window.location.origin }
+  }
+
+  if (!fromEnv) {
+    return {
+      block:
+        'VITE_SERVER_URL is missing from this deployment. In Vercel → Settings → Environment Variables, add VITE_SERVER_URL with your API origin, save, then trigger a new Production deploy (Redeploy). Values are baked in at build time—not at runtime.',
+    }
+  }
+
+  let apiOrigin: string
+  try {
+    apiOrigin = new URL(fromEnv).origin
+  } catch {
+    return { block: `VITE_SERVER_URL is not a valid URL: "${raw}". Use https://your-api-host.com with no path.` }
+  }
+
+  if (apiOrigin === window.location.origin) {
+    return {
+      block:
+        'VITE_SERVER_URL is set to this same website (your Vercel frontend). That cannot work. Set it to the URL where you deployed the Node game server (repo folder /server)—for example https://something.onrender.com or https://something.railway.app—a different hostname from this page. Then redeploy this project.',
+    }
+  }
+
+  return { url: fromEnv }
 }
 
-const PROD_BACKEND_HELP =
-  'This site is static hosting only. Deploy the Node server from /server (Render, Railway, Fly, etc.), then in Vercel → Project → Environment Variables set VITE_SERVER_URL to that API origin (https://…, no path). Redeploy. On the server set CLIENT_ORIGIN to your Vercel URL for CORS.'
+/** Label for the “API:” line in the footer. */
+function apiConfigSummary(): string {
+  if (import.meta.env.DEV) {
+    return `${window.location.origin} (Vite → proxy → Socket.IO API)`
+  }
+  const raw = import.meta.env.VITE_SERVER_URL?.trim()
+  if (!raw) {
+    return '(VITE_SERVER_URL was empty at build — redeploy after setting the env var)'
+  }
+  return raw.replace(/\/$/, '')
+}
 
 export function App(): ReactElement {
   const [socket, setSocket] = useState<Socket | null>(null)
@@ -30,11 +66,12 @@ export function App(): ReactElement {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    const origin = socketOrigin()
-    if (!origin) {
-      setError(PROD_BACKEND_HELP)
+    const target = resolveSocketTarget()
+    if ('block' in target) {
+      setError(target.block)
       return
     }
+    const { url: origin } = target
 
     const s = io(origin, { path: '/socket.io' })
     setSocket(s)
@@ -109,7 +146,7 @@ export function App(): ReactElement {
         </div>
         {error ? <div className="err">{error}</div> : null}
         <div style={{ fontSize: '0.82rem', color: 'var(--muted)' }}>
-          API: <code>{socketOrigin() ?? '(not configured — see message above)'}</code>
+          API / build config: <code>{apiConfigSummary()}</code>
           {playerId ? (
             <>
               {' '}

@@ -30,7 +30,11 @@ Vercel only hosts the **static** UI. The game **API** is the `server` package (E
 3. In **Vercel** → your project → **Settings → Environment Variables**, add **`VITE_SERVER_URL`** = the **public HTTPS origin** of your API (no path, no trailing slash), e.g. `https://football-snake-api.onrender.com`.
 4. **Redeploy** the Vercel project so the client is rebuilt with that variable (Vite bakes it in at build time).
 
-If the UI shows “not configured”, `VITE_SERVER_URL` is missing from the production build. If it shows “Cannot reach game server” with a URL, the API is down, blocked, or CORS/`CLIENT_ORIGIN` is wrong.
+If the UI says the variable is **missing from the deployment**, you added it in Vercel but did not **Redeploy** (or saved without deploy). Vite reads env vars **only when the frontend build runs**.
+
+**Common mistake:** `VITE_SERVER_URL=https://your-app.vercel.app` (the **frontend**) is wrong. The game API is the **`server`** package on another host, e.g. `https://football-api.onrender.com`. The frontend and API must be **two different URLs**.
+
+If it shows “Cannot reach game server” with a **correct** API URL, the API is down, blocked, or **`CLIENT_ORIGIN`** on the server does not include your Vercel frontend origin.
 
 Use a **HTTPS** API URL when the site is served over HTTPS (mixed content otherwise).
 
