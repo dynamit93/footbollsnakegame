@@ -4,11 +4,10 @@
 const checks = [
   ['Vercel UI', 'https://footbollsnakegame-client.vercel.app/', (r) => r.ok],
   ['socket-config.json', 'https://footbollsnakegame-client.vercel.app/socket-config.json', (r) => r.ok],
-  [
-    'API /health',
+  ...[
     'https://footbollsnakegame-api.onrender.com/health',
-    (r) => r.ok && r.status === 200,
-  ],
+    'https://footbollsnakegame.onrender.com/health',
+  ].map((url) => [`API /health ${new URL(url).hostname}`, url, (r) => r.ok && r.status === 200]),
 ]
 
 let failed = false
