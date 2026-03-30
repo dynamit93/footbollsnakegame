@@ -13,6 +13,15 @@ npm run dev
 
 Open the Vite URL (usually [http://localhost:5173](http://localhost:5173)). Run `npm run build` for production builds.
 
+## Deploy the API on Render (recommended)
+
+This repo includes [`render.yaml`](render.yaml) for a **Node Web Service** that runs the game server.
+
+1. In [Render](https://render.com), **New → Blueprint**, connect [footbollsnakegame](https://github.com/dynamit93/footbollsnakegame) (or **New → Web Service** with root repo and the same build/start commands as in `render.yaml`).
+2. When prompted for **`CLIENT_ORIGIN`**, set your **Vercel frontend** origin exactly (no path), e.g. `https://footbollsnakegame-client.vercel.app`.
+3. After the service is live, copy its URL (e.g. `https://footbollsnakegame-api.onrender.com`).
+4. In Vercel → **Environment Variables**: set **`VITE_SERVER_URL`** to that API URL (not your `*.vercel.app` UI). Save and **Redeploy** the frontend.
+
 ## Deploy on Vercel (static UI)
 
 The app is a static Vite build. The real-time server must be hosted separately (Railway, Render, Fly, etc.).

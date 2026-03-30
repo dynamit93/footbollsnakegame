@@ -1,0 +1,22 @@
+# Deploy the Socket.IO API on Render (free tier spins down when idle).
+# https://render.com/docs/blueprint-spec
+#
+# After deploy: set env CLIENT_ORIGIN to your Vercel UI (e.g. https://footbollsnakegame-client.vercel.app)
+# then set VITE_SERVER_URL on Vercel to this service's public URL and redeploy the frontend.
+
+services:
+  - type: web
+    name: footbollsnakegame-api
+    runtime: node
+    plan: free
+    region: oregon
+    buildCommand: npm install && npm run build -w shared && npm run build -w server
+    startCommand: npm run start -w server
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: "20.18.0"
+      # Required: your static site origin(s), comma-separated. Example:
+      # https://footbollsnakegame-client.vercel.app
+      - key: CLIENT_ORIGIN
+        sync: false
