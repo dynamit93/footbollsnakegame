@@ -27,12 +27,14 @@ function Cell(props: {
   let snakeHead = false
   let snakeColor: string | null = null
   let snakeTail = false
+  let headLabel = ''
   for (const p of players) {
     if (p.segments.length === 0) continue
     const idx = p.segments.findIndex((s: Vec2) => s.x === x && s.y === y)
     if (idx === 0) {
       snakeHead = true
       snakeColor = p.color
+      headLabel = p.displayName || 'Player'
     } else if (idx > 0) {
       snakeTail = true
       snakeColor = p.color
@@ -58,10 +60,13 @@ function Cell(props: {
       }
     >
       {snakeHead ? (
-        <div
-          className="snake-head"
-          style={{ width: '100%', height: '100%', borderRadius: 4 }}
-        />
+        <div className="snake-head-wrap">
+          <span className="player-name-tag">{headLabel}</span>
+          <div
+            className="snake-head"
+            style={{ width: '100%', height: '100%', borderRadius: 4 }}
+          />
+        </div>
       ) : null}
     </div>
   )
@@ -109,13 +114,13 @@ export function GameBoard(props: {
         </span>
         {me ? (
           <span className="pill tag-you">
-            You: {scores[selfId] ?? 0}{' '}
+            You ({me.displayName}): {scores[selfId] ?? 0}{' '}
             {state.carrierId === selfId ? '(have ball)' : ''}
           </span>
         ) : null}
         {opp ? (
           <span className="pill">
-            Opponent: {scores[opp.id] ?? 0}{' '}
+            {opp.displayName}: {scores[opp.id] ?? 0}{' '}
             {state.carrierId === opp.id ? '(has ball)' : ''}
           </span>
         ) : null}
@@ -169,11 +174,9 @@ export function GameBoard(props: {
           <p>
             Match over — winner:{' '}
             <strong>
-              {winnerId === selfId
-                ? 'You'
-                : winnerId
-                  ? `${winnerId.slice(0, 8)}…`
-                  : '—'}
+              {winnerId
+                ? (players.find((p) => p.id === winnerId)?.displayName ?? '—')
+                : '—'}
             </strong>
           </p>
           <button type="button" onClick={onRematch}>

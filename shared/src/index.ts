@@ -27,6 +27,8 @@ export interface PublicPlayer {
   id: string
   segments: Vec2[]
   color: string
+  /** Shown above the snake head */
+  displayName: string
 }
 
 export interface ServerToClientEvents {
@@ -40,8 +42,8 @@ export interface ServerToClientEvents {
 }
 
 export interface ClientToServerEvents {
-  createRoom: () => void
-  joinRoom: (code: string) => void
+  createRoom: (displayName: string) => void
+  joinRoom: (code: string, displayName: string) => void
   setDirection: (dir: Direction) => void
   rematch: () => void
 }

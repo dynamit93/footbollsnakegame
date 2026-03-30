@@ -114,6 +114,34 @@ button.secondary {
   position: relative;
 }
 
+.snake-head-wrap {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.player-name-tag {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-bottom: 2px;
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
+  max-width: 72px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: #0c1410;
+  background: rgba(254, 252, 232, 0.92);
+  border: 1px solid rgba(0, 0, 0, 0.2);
+  pointer-events: none;
+  z-index: 2;
+}
+
 .cell.goal-left,
 .cell.goal-right {
   background: var(--goal);

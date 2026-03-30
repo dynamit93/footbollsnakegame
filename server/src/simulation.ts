@@ -253,6 +253,7 @@ export function toPublicState(s: SimState): PublicGameState {
     id: p.id,
     segments: p.segments.map((c) => ({ ...c })),
     color: PLAYER_COLORS[i % PLAYER_COLORS.length]!,
+    displayName: '',
   }))
   return {
     grid: { ...s.grid },

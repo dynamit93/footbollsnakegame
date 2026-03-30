@@ -37,16 +37,41 @@ interface Room {
   sim: SimState | null
   pendingInput: Record<string, Direction | undefined>
   tickTimer: ReturnType<typeof setInterval> | null
+  displayNames: Record<string, string>
 }
 
 const rooms = new Map<string, Room>()
 const socketRoom = new Map<string, string>()
+
+const DISPLAY_NAME_MAX = 24
+
+function sanitizeDisplayName(raw: unknown): string {
+  if (typeof raw !== 'string') return ''
+  return raw
+    .trim()
+    .slice(0, DISPLAY_NAME_MAX)
+    .replace(/[\u0000-\u001f\u007f]/g, '')
+}
+
+function finalizePublicState(pub: PublicGameState, room: Room): PublicGameState {
+  return {
+    ...pub,
+    players: pub.players.map((p) => {
+      const n = sanitizeDisplayName(room.displayNames[p.id])
+      return {
+        ...p,
+        displayName: n || 'Player',
+      }
+    }),
+  }
+}
 
 function lobbyPublic(room: Room): PublicGameState {
   const players = room.sockets.map((id, i) => ({
     id,
     segments: [] as { x: number; y: number }[],
     color: PLAYER_COLORS[i % PLAYER_COLORS.length]!,
+    displayName: '',
   }))
   const scores: Record<string, number> = {}
   for (const id of room.sockets) scores[id] = 0
@@ -70,10 +95,11 @@ function emitRoom(
   io: Server<ClientToServerEvents, ServerToClientEvents>,
   room: Room,
 ): void {
-  const pub: PublicGameState =
+  const base: PublicGameState =
     room.sim && room.sockets.length === 2
       ? toPublicState(room.sim)
       : lobbyPublic(room)
+  const pub = finalizePublicState(base, room)
   io.to(room.code).emit('state', pub)
 }
 
@@ -128,6 +154,7 @@ function leaveRoom(socketId: string, ioServer: Server<ClientToServerEvents, Serv
   if (!room) return
 
   stopTick(room)
+  delete room.displayNames[socketId]
   room.sockets = room.sockets.filter((id) => id !== socketId)
   void ioServer.sockets.sockets.get(socketId)?.leave(code)
   room.sim = null
@@ -170,7 +197,12 @@ const io = new Server<ClientToServerEvents, ServerToClientEvents>(httpServer, {
 })
 
 io.on('connection', (socket) => {
-  socket.on('createRoom', () => {
+  socket.on('createRoom', (displayName) => {
+    const name = sanitizeDisplayName(displayName)
+    if (!name) {
+      socket.emit('error', 'Enter your name (1–24 characters).')
+      return
+    }
     leaveRoom(socket.id, io)
     let code = randomRoomCode()
     while (rooms.has(code)) code = randomRoomCode()
@@ -180,16 +212,22 @@ io.on('connection', (socket) => {
       sim: null,
       pendingInput: {},
       tickTimer: null,
+      displayNames: { [socket.id]: name },
     }
     rooms.set(code, room)
     socketRoom.set(socket.id, code)
     void socket.join(code)
-    const pub = lobbyPublic(room)
+    const pub = finalizePublicState(lobbyPublic(room), room)
     socket.emit('roomJoined', { roomCode: code, playerId: socket.id, state: pub })
     io.to(code).emit('state', pub)
   })
 
-  socket.on('joinRoom', (rawCode) => {
+  socket.on('joinRoom', (rawCode, displayName) => {
+    const name = sanitizeDisplayName(displayName)
+    if (!name) {
+      socket.emit('error', 'Enter your name (1–24 characters).')
+      return
+    }
     const code = rawCode.trim().toUpperCase()
     const room = rooms.get(code)
     if (!room) {
@@ -206,12 +244,14 @@ io.on('connection', (socket) => {
     }
     leaveRoom(socket.id, io)
     room.sockets.push(socket.id)
+    room.displayNames[socket.id] = name
     socketRoom.set(socket.id, code)
     void socket.join(code)
     ensureMatchStarted(io, room)
     const r = rooms.get(code)!
-    const pub =
+    const base =
       r.sim && r.sockets.length === 2 ? toPublicState(r.sim) : lobbyPublic(r)
+    const pub = finalizePublicState(base, r)
     socket.emit('roomJoined', { roomCode: code, playerId: socket.id, state: pub })
     io.to(code).emit('state', pub)
   })

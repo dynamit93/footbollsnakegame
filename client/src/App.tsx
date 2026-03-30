@@ -117,10 +117,13 @@ async function resolveProductionSocket(): Promise<ResolveResult> {
   }
 }
 
+const DISPLAY_NAME_MAX = 24
+
 export function App(): ReactElement {
   const [socket, setSocket] = useState<Socket | null>(null)
   const [playerId, setPlayerId] = useState<string | null>(null)
   const [roomCode, setRoomCode] = useState<string | null>(null)
+  const [displayName, setDisplayName] = useState('')
   const [joinInput, setJoinInput] = useState('')
   const [state, setState] = useState<PublicGameState | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -178,14 +181,18 @@ export function App(): ReactElement {
     }
   }, [])
 
+  const trimmedName = displayName.trim()
+  const nameOk = trimmedName.length > 0 && trimmedName.length <= DISPLAY_NAME_MAX
+
   const createRoom = useCallback(() => {
-    socket?.emit('createRoom')
-  }, [socket])
+    if (!socket || !nameOk) return
+    socket.emit('createRoom', trimmedName)
+  }, [socket, trimmedName, nameOk])
 
   const joinRoom = useCallback(() => {
-    if (!socket || !joinInput.trim()) return
-    socket.emit('joinRoom', joinInput)
-  }, [socket, joinInput])
+    if (!socket || !joinInput.trim() || !nameOk) return
+    socket.emit('joinRoom', joinInput.trim(), trimmedName)
+  }, [socket, joinInput, trimmedName, nameOk])
 
   const rematch = useCallback(() => {
     socket?.emit('rematch')
@@ -209,8 +216,24 @@ export function App(): ReactElement {
       </header>
 
       <div className="panel">
+        <div style={{ marginBottom: '0.65rem' }}>
+          <label htmlFor="display-name" className="sub" style={{ display: 'block', marginBottom: '0.25rem' }}>
+            Your name
+          </label>
+          <input
+            id="display-name"
+            type="text"
+            placeholder="e.g. Alex"
+            value={displayName}
+            onChange={(e) => setDisplayName(e.target.value.slice(0, DISPLAY_NAME_MAX))}
+            maxLength={DISPLAY_NAME_MAX}
+            autoComplete="nickname"
+            aria-label="Your display name"
+            style={{ width: '100%', maxWidth: '16rem', marginBottom: '0.65rem' }}
+          />
+        </div>
         <div className="row" style={{ marginBottom: '0.65rem' }}>
-          <button type="button" onClick={createRoom} disabled={!socket}>
+          <button type="button" onClick={createRoom} disabled={!socket || !nameOk}>
             Create room
           </button>
           <input
@@ -221,7 +244,7 @@ export function App(): ReactElement {
             maxLength={6}
             aria-label="Room code"
           />
-          <button type="button" className="secondary" onClick={joinRoom} disabled={!socket}>
+          <button type="button" className="secondary" onClick={joinRoom} disabled={!socket || !nameOk}>
             Join
           </button>
         </div>
