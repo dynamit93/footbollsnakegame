@@ -10,51 +10,84 @@ import type { PublicGameState } from '@soccer-snake/shared'
 import { WIN_SCORE } from '@soccer-snake/shared'
 import { GameBoard } from './GameBoard.tsx'
 
-type SocketTarget = { url: string } | { block: string }
+/** Default host for Render service `footbollsnakegame-api` (see repo root `render.yaml`). */
+const DEFAULT_RENDER_API = 'https://footbollsnakegame-api.onrender.com'
 
-/** Dev: browser origin (Vite proxies /socket.io). Prod: VITE_SERVER_URL must be a different host (your Node API), not this Vercel app. */
-function resolveSocketTarget(): SocketTarget {
-  const raw = import.meta.env.VITE_SERVER_URL?.trim() ?? ''
-  const fromEnv = raw.replace(/\/$/, '')
-
-  if (import.meta.env.DEV) {
-    return { url: window.location.origin }
-  }
-
-  if (!fromEnv) {
-    return {
-      block:
-        'VITE_SERVER_URL is missing from this deployment. In Vercel → Settings → Environment Variables, add VITE_SERVER_URL with your API origin, save, then trigger a new Production deploy (Redeploy). Values are baked in at build time—not at runtime.',
-    }
-  }
-
-  let apiOrigin: string
-  try {
-    apiOrigin = new URL(fromEnv).origin
-  } catch {
-    return { block: `VITE_SERVER_URL is not a valid URL: "${raw}". Use https://your-api-host.com with no path.` }
-  }
-
-  if (apiOrigin === window.location.origin) {
-    return {
-      block:
-        'VITE_SERVER_URL is set to this same website (your Vercel frontend). That cannot work. Set it to the URL where you deployed the Node game server (repo folder /server)—for example https://something.onrender.com or https://something.railway.app—a different hostname from this page. Then redeploy this project.',
-    }
-  }
-
-  return { url: fromEnv }
+function normalizeOriginInput(raw: string): string {
+  return raw.trim().replace(/\/$/, '')
 }
 
-/** Label for the “API:” line in the footer. */
-function apiConfigSummary(): string {
-  if (import.meta.env.DEV) {
-    return `${window.location.origin} (Vite → proxy → Socket.IO API)`
+/** Valid URL whose origin is not the current page (real API host). */
+function usableApiUrl(candidate: string, pageOrigin: string): string | null {
+  const s = normalizeOriginInput(candidate)
+  if (!s) return null
+  try {
+    const u = new URL(s)
+    if (u.origin === pageOrigin) return null
+    return s
+  } catch {
+    return null
   }
-  const raw = import.meta.env.VITE_SERVER_URL?.trim()
-  if (!raw) {
-    return '(VITE_SERVER_URL was empty at build — redeploy after setting the env var)'
+}
+
+type ResolveResult =
+  | { ok: true; url: string; label: string }
+  | { ok: false; message: string }
+
+async function resolveProductionSocket(): Promise<ResolveResult> {
+  const page = window.location.origin
+
+  const envRaw = import.meta.env.VITE_SERVER_URL?.trim() ?? ''
+  const fromEnv = usableApiUrl(envRaw, page)
+  if (fromEnv) {
+    return { ok: true, url: fromEnv, label: `${fromEnv} (VITE_SERVER_URL)` }
   }
-  return raw.replace(/\/$/, '')
+
+  try {
+    const res = await fetch('/socket-config.json', { cache: 'no-store' })
+    if (res.ok) {
+      const data = (await res.json()) as { apiOrigin?: string }
+      const fromFile = usableApiUrl(data.apiOrigin ?? '', page)
+      if (fromFile) {
+        return {
+          ok: true,
+          url: fromFile,
+          label: `${fromFile} (socket-config.json; Vercel env ignored if wrong)`,
+        }
+      }
+    }
+  } catch {
+    /* no file */
+  }
+
+  const fromDefault = usableApiUrl(DEFAULT_RENDER_API, page)
+  if (fromDefault) {
+    return {
+      ok: true,
+      url: fromDefault,
+      label: `${fromDefault} (built-in default — deploy API on Render or edit public/socket-config.json)`,
+    }
+  }
+
+  if (envRaw) {
+    try {
+      if (new URL(normalizeOriginInput(envRaw)).origin === page) {
+        return {
+          ok: false,
+          message:
+            'VITE_SERVER_URL points at this Vercel site. Remove or fix it, set public/socket-config.json apiOrigin to your API, deploy the Node server, then redeploy.',
+        }
+      }
+    } catch {
+      /* fall through */
+    }
+  }
+
+  return {
+    ok: false,
+    message:
+      'No API URL found. Deploy the server (see README / render.yaml), set public/socket-config.json apiOrigin, or set VITE_SERVER_URL to that API (not this site), then redeploy.',
+  }
 }
 
 export function App(): ReactElement {
@@ -64,35 +97,56 @@ export function App(): ReactElement {
   const [joinInput, setJoinInput] = useState('')
   const [state, setState] = useState<PublicGameState | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [apiLine, setApiLine] = useState<string>('Resolving API…')
 
   useEffect(() => {
-    const target = resolveSocketTarget()
-    if ('block' in target) {
-      setError(target.block)
-      return
-    }
-    const { url: origin } = target
+    let cancelled = false
+    let s: Socket | null = null
 
-    const s = io(origin, { path: '/socket.io' })
-    setSocket(s)
-    s.on('connect', () => setError(null))
-    s.on('connect_error', () =>
-      setError(
-        import.meta.env.DEV
-          ? 'Cannot reach game server. From repo root run `npm run dev` so the API runs on port 3001 (or set VITE_DEV_SERVER_URL in .env).'
-          : `Cannot reach game server at ${origin}. Confirm the API is running, uses HTTPS if this page is HTTPS, and allows this origin in SERVER CORS (CLIENT_ORIGIN).`,
-      ),
-    )
-    s.on('roomJoined', (p) => {
-      setRoomCode(p.roomCode)
-      setPlayerId(p.playerId)
-      setState(p.state)
-      setError(null)
-    })
-    s.on('state', setState)
-    s.on('error', (msg: string) => setError(msg))
+    const attach = (origin: string) => {
+      if (cancelled) return
+      s = io(origin, { path: '/socket.io' })
+      setSocket(s)
+      s.on('connect', () => setError(null))
+      s.on('connect_error', () =>
+        setError(
+          import.meta.env.DEV
+            ? 'Cannot reach game server. From repo root run `npm run dev` so the API runs on port 3001 (or set VITE_DEV_SERVER_URL in .env).'
+            : `Cannot reach game server at ${origin}. Deploy the API (Render/Railway), check /health, and set CLIENT_ORIGIN on the server to ${window.location.origin}`,
+        ),
+      )
+      s.on('roomJoined', (p) => {
+        setRoomCode(p.roomCode)
+        setPlayerId(p.playerId)
+        setState(p.state)
+        setError(null)
+      })
+      s.on('state', setState)
+      s.on('error', (msg: string) => setError(msg))
+    }
+
+    void (async () => {
+      if (import.meta.env.DEV) {
+        const origin = window.location.origin
+        setApiLine(`${origin} (Vite proxy → Socket.IO)`)
+        attach(origin)
+        return
+      }
+
+      const r = await resolveProductionSocket()
+      if (cancelled) return
+      if (!r.ok) {
+        setApiLine('(not connected)')
+        setError(r.message)
+        return
+      }
+      setApiLine(r.label)
+      attach(r.url)
+    })()
+
     return () => {
-      s.disconnect()
+      cancelled = true
+      s?.disconnect()
       setSocket(null)
     }
   }, [])
@@ -146,7 +200,7 @@ export function App(): ReactElement {
         </div>
         {error ? <div className="err">{error}</div> : null}
         <div style={{ fontSize: '0.82rem', color: 'var(--muted)' }}>
-          API / build config: <code>{apiConfigSummary()}</code>
+          API: <code style={{ wordBreak: 'break-all' }}>{apiLine}</code>
           {playerId ? (
             <>
               {' '}

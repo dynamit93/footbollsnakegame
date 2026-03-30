@@ -20,7 +20,7 @@ This repo includes [`render.yaml`](render.yaml) for a **Node Web Service** that 
 1. In [Render](https://render.com), **New → Blueprint**, connect [footbollsnakegame](https://github.com/dynamit93/footbollsnakegame) (or **New → Web Service** with root repo and the same build/start commands as in `render.yaml`).
 2. When prompted for **`CLIENT_ORIGIN`**, set your **Vercel frontend** origin exactly (no path), e.g. `https://footbollsnakegame-client.vercel.app`.
 3. After the service is live, copy its URL (e.g. `https://footbollsnakegame-api.onrender.com`).
-4. In Vercel → **Environment Variables**: set **`VITE_SERVER_URL`** to that API URL (not your `*.vercel.app` UI). Save and **Redeploy** the frontend.
+4. In Vercel → **Environment Variables**: set **`VITE_SERVER_URL`** to that API URL (not your `*.vercel.app` UI), **or** leave/remove a wrong value — the client also reads [`client/public/socket-config.json`](client/public/socket-config.json) and falls back to the default Render hostname from [`render.yaml`](render.yaml). Save and **Redeploy** the frontend.
 
 ## Deploy on Vercel (static UI)
 
