@@ -15,7 +15,7 @@ services:
     healthCheckPath: /health
     envVars:
       - key: NODE_VERSION
-        value: "20.18.0"
+        value: "22.14.0"
       # Required: your static site origin(s), comma-separated. Example:
       # https://footbollsnakegame-client.vercel.app
       - key: CLIENT_ORIGIN

@@ -1,6 +1,6 @@
 # Game API (Socket.IO). Build from repo root: docker build -t footboll-api .
 # Render/Fly/Koyeb can use this instead of the native Node buildpack.
-FROM node:20-alpine
+FROM node:22-alpine
 WORKDIR /app
 
 COPY package.json package-lock.json ./
